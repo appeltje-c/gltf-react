@@ -1,71 +1,47 @@
-import { OrbitControls, Stage, useGLTF } from '@react-three/drei'
-import { Canvas, MeshProps, useFrame } from '@react-three/fiber'
-import { Suspense, useRef, useState } from 'react'
-import { Mesh } from 'three'
-import { useTweaks } from 'tweak-tools'
+import { useEffect, useState } from 'react'
+import { LoadingManager } from 'three'
+import { GLTF, GLTFLoader } from 'three/examples/jsm/Addons.js'
+import { Canvas } from '@react-three/fiber'
+import { Environment, OrbitControls } from '@react-three/drei'
+import Scene from './components/Scene'
+import { useStore } from './store'
 
-const model = '/suzanne.gltf'
+export default function App() {
 
-function Box(props: MeshProps) {
 
-  // This reference gives us direct access to the THREE.Mesh object
-  const ref = useRef<Mesh>(null!)
+  const { saveScene } = useStore(state => state)
+  const [gltf, setGltf] = useState<GLTF>(null!)
+  const loadingManager = new LoadingManager()
+  const gltfLoader = new GLTFLoader(loadingManager)
 
-  // Hold state for hovered and clicked events
-  const [hovered, hover] = useState(false)
-  const [clicked, click] = useState(false)
+  useEffect(() => {
 
-  // Subscribe this component to the render-loop, rotate the mesh every frame
-  useFrame((_, delta) => (ref.current.rotation.x += delta))
+    fetch("http://localhost:3000/v1/design/6797687e885ce11612608490").then(response => {
+      response.json().then(data => {
+        gltfLoader.parse(data.gltf, '/', (gltf) => {
+          setGltf(gltf)
+          console.info(gltf)
+        })
+      })
+    })
 
-  // Return the view, these are regular Threejs elements expressed in JSX
-  return (
-    <mesh
-      {...props}
-      ref={ref}
-      scale={clicked ? 1.5 : 1}
-      onClick={() => click(!clicked)}
-      onPointerOver={(event) => (event.stopPropagation(), hover(true))}
-      onPointerOut={() => hover(false)}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={hovered ? 'hotpink' : 'orange'} />
-    </mesh>
-  )
-}
-
-function App() {
-
-  const { nodes } = useGLTF(model)
-  const { rotation } = useTweaks({
-    rotation: { value: -0.4, step: 0.2, label: 'Rotate Suzanne' }
-  })
+  }, [])
 
   return (
-    <Canvas>
-
-      <Stage preset={'portrait'}>
-
-        <Suspense>
-          <mesh
-            position={[0, 0, 0]}
-            rotation={[0, rotation, 0]}
-            castShadow
-            receiveShadow
-            geometry={nodes.Suzanne.geometry}
-            material={nodes.Suzanne.material}>
-          </mesh>
-        </Suspense>
-
-        <Box position={[2, 0.2, 0]} />
-
+    <>
+      <Canvas>
+        <Environment preset='apartment' />
+        <Scene gltf={gltf} />
         <OrbitControls />
-
-      </Stage>
-
-    </Canvas>
+        {/* <Perf
+          matrixUpdate
+          deepAnalyze
+          overClock /> */}
+      </Canvas>
+      <div style={{ zIndex: 10000000, width: '250px', position: 'absolute', top: 10, left: 10 }}>
+        <button onClick={() => saveScene()}>Save</button>
+      </div>
+    </>
   )
+
 }
-
-export default App
-
-useGLTF.preload(model)
